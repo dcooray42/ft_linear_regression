@@ -16,6 +16,9 @@ class MyLinearRegression():
         self.max_iter = max_iter
         self.thetas = Thetas
         self.mse_values = []
+        self.rmse_values = []
+        self.mae_values = []
+        self.r2_values = []
 
     def fit_(self, x, y, y_ori) :
 
@@ -41,7 +44,11 @@ class MyLinearRegression():
             Theta = theta.squeeze().astype(float) if theta.shape != (1, 1) else theta.flatten().astype(float)
             if Y.ndim != 1 or Theta.ndim != 1 or X.shape[0] != Y.shape[0] or Y.shape[0] != Y_ori.shape[0] or X.shape[1] != Theta.shape[0] :
                 return None
-            self.mse_values.append(self.mse_(reverse_zscore(Y, Y_ori), reverse_zscore(X.dot(Theta) - Y, Y_ori)))
+            rev_y_hat = reverse_zscore(X.dot(Theta), Y_ori)
+            self.mse_values.append(self.mse_(Y_ori, rev_y_hat))
+            self.rmse_values.append(self.rmse_(Y_ori, rev_y_hat))
+            self.mae_values.append(self.mae_(Y_ori, rev_y_hat))
+            self.r2_values.append(self.r2score_(Y_ori, rev_y_hat))
             return X.T.dot(X.dot(Theta) - Y).reshape(-1, 1) / Y.shape[0]
 
         if type(x).__module__ != np.__name__ or type(y).__module__ != np.__name__ or type(y_ori).__module__ != np.__name__ or type(self.thetas).__module__ != np.__name__ :
@@ -118,6 +125,33 @@ class MyLinearRegression():
         if Y.ndim != 1 or Y_hat.ndim != 1 or Y.shape != Y_hat.shape :
             return None
         return (Y_hat - Y).dot(Y_hat - Y) / Y.shape[0]
+
+    def rmse_(self, y, y_hat) :
+        return self.mse_(y, y_hat) ** (1 / 2)
+
+    def mae_(self, y, y_hat) :
+        if type(y).__module__ != np.__name__ or type(y_hat).__module__ != np.__name__ :
+            return None
+        if y.size <= 0 or y_hat.size <= 0 :
+            return None
+        Y = y.squeeze().astype(float) if (y.shape != (1, 1) and y.shape != (1,)) else y.flatten().astype(float)
+        Y_hat = y_hat.squeeze().astype(float) if (y_hat.shape != (1, 1) and y_hat.shape != (1,)) else y_hat.flatten().astype(float)
+        if Y.ndim != 1 or Y_hat.ndim != 1 or Y.shape != Y_hat.shape :
+            return None
+        return sum(np.absolute(Y_hat - Y)) / Y.shape[0]
+
+    def r2score_(self, y, y_hat) :
+        if type(y).__module__ != np.__name__ or type(y_hat).__module__ != np.__name__ :
+            return None
+        if y.size <= 0 or y_hat.size <= 0 :
+            return None
+        Y = y.squeeze().astype(float) if (y.shape != (1, 1) and y.shape != (1,)) else y.flatten().astype(float)
+        Y_hat = y_hat.squeeze().astype(float) if (y_hat.shape != (1, 1) and y_hat.shape != (1,)) else y_hat.flatten().astype(float)
+        if Y.ndim != 1 or Y_hat.ndim != 1 or Y.shape != Y_hat.shape :
+            return None
+        mean = sum(Y) / Y.shape[0]
+        return 1 - ((Y_hat - Y).dot(Y_hat - Y) / (Y - mean).dot(Y - mean))
+
     
 def data_spliter(x, y, proportion) :
     if type(x).__module__ != np.__name__ or type(y).__module__ != np.__name__ :
@@ -172,10 +206,16 @@ def main() :
         Y = zscore(y)
     except :
         return
-    lr = MyLinearRegression(np.array([0, 0]), 1e-5, 1000000)
+    lr = MyLinearRegression(np.array([0, 0]), 1e-2, 500)
     thetas = lr.fit_(x, Y, y)
     with open("thetas.pkl", "wb") as f:
-        pickle.dump({"thetas" : thetas, "mse_values" : lr.mse_values}, f)
+        pickle.dump({
+            "thetas" : thetas,
+            "mse_values" : lr.mse_values,
+            "rmse_values" : lr.rmse_values,
+            "mae_values" : lr.mae_values,
+            "r2_values" : lr.r2_values
+        }, f)
 
 if __name__ == "__main__" :
     main()
